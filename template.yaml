@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Recipes API — AWS SAM template (Micronaut).
+  Defines the Lambda function and API Gateway routes for local testing and AWS deployment.
+  Local testing: sam local start-api (requires Docker).
+  Build first with: mvn clean package -DskipTests (Maven 'local' profile must NOT be active).
+
+# Globals apply to all Functions in this template unless overridden per resource.
+Globals:
+  Function:
+    # Must match the Java version in pom.xml (<maven.compiler.release>17</maven.compiler.release>).
+    Runtime: java17
+
+    # Micronaut cold starts are significantly faster than Spring Boot (~5-10s vs ~60s)
+    # because DI metadata is generated at compile time (no runtime classpath scanning).
+    # 512 MB is sufficient; increase only if OOM errors appear under load.
+    MemorySize: 512
+
+    # Lower than the Spring Boot equivalent — Micronaut initialises much faster.
+    # Still generous enough to accommodate Docker startup on the first SAM local request.
+    Timeout: 30
+
+Resources:
+  RecipesFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      # Use a Makefile instead of SAM's default Maven workflow.
+      # The Makefile copies the pre-built fat JAR to ARTIFACTS_DIR,
+      # avoiding a full Maven rebuild (and checkstyle) on every sam build.
+      BuildMethod: makefile
+    Properties:
+      # Micronaut's built-in API Gateway proxy handler. Initialises the Micronaut
+      # application context and routes each API Gateway proxy event to the
+      # appropriate Micronaut controller. No custom handler class required.
+      Handler: io.micronaut.function.aws.proxy.payload1.ApiGatewayProxyRequestEventFunction
+
+      # Path to the recipes-api module folder containing the Makefile.
+      CodeUri: recipes-api/
+
+      # API Gateway event sources — one entry per endpoint.
+      Events:
+        ListRecipes:
+          Type: Api
+          Properties:
+            Path: /recipes
+            Method: GET
+
+        CreateRecipe:
+          Type: Api
+          Properties:
+            Path: /recipes
+            Method: POST
+
+        GetRecipeById:
+          Type: Api
+          Properties:
+            Path: /recipes/{id}
+            Method: GET
+
+Outputs:
+  RecipesFunctionApi:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
