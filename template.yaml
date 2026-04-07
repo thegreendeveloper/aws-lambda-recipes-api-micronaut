@@ -25,9 +25,9 @@ Resources:
   RecipesFunction:
     Type: AWS::Serverless::Function
     Metadata:
-      # Use a Makefile instead of SAM's default Maven workflow.
-      # The Makefile copies the pre-built fat JAR to ARTIFACTS_DIR,
-      # avoiding a full Maven rebuild (and checkstyle) on every sam build.
+      # SAM's built-in Java Maven workflow only supports single-module projects.
+      # The Makefile runs 'mvn clean package -DskipTests' from the project root
+      # (building all three modules) then copies the fat JAR to ARTIFACTS_DIR.
       BuildMethod: makefile
     Properties:
       # Micronaut's built-in API Gateway proxy handler. Initialises the Micronaut
@@ -35,8 +35,9 @@ Resources:
       # appropriate Micronaut controller. No custom handler class required.
       Handler: io.micronaut.function.aws.proxy.payload1.ApiGatewayProxyRequestEventFunction
 
-      # Path to the recipes-api module folder containing the Makefile.
-      CodeUri: recipes-api/
+      # Project root — SAM copies the full multi-module tree to the build temp
+      # directory so Maven can resolve all sibling modules when building.
+      CodeUri: ./
 
       # API Gateway event sources — one entry per endpoint.
       Events:

@@ -9,15 +9,10 @@ A spec-first REST API built with Micronaut, deployed as an AWS Lambda function b
 - Docker (for local testing via SAM)
 - [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
 
-## Build
-
-```bash
-mvn clean package -DskipTests
-```
-
 ## Local testing
 
 There is no embedded server. Local testing runs the actual Lambda runtime in Docker via SAM CLI.
+`sam build` compiles the project and packages the Lambda function in one step.
 
 ```bash
 sam build
@@ -25,6 +20,27 @@ sam local start-api
 ```
 
 The API is available at `http://localhost:3000`.
+
+> **Note:** `sam local start-api` runs entirely in Docker on your machine — it never touches AWS and incurs no cost.
+
+### Debugging with IntelliJ
+
+Start SAM with the JDWP debug port exposed:
+
+```bash
+sam build
+sam local start-api --debug-port 5858 --debug-args "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5858"
+```
+
+Then in IntelliJ create a **Remote JVM Debug** run configuration:
+
+| Setting | Value |
+|---|---|
+| Host | `localhost` |
+| Port | `5858` |
+| Debugger mode | Attach to remote JVM |
+
+With `suspend=y` the Lambda container waits for the debugger to attach before processing each request. Send a request (e.g. `curl http://localhost:3000/recipes`), then launch the debug configuration in IntelliJ — execution will stop at your breakpoints.
 
 ### Endpoints
 

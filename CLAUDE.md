@@ -10,25 +10,18 @@ Multi-module Maven project:
 | `recipes-service` | `recipes-service` | Business logic, domain models, exceptions |
 | `recipes-api` | `recipes-api-rest` | REST controllers, OpenAPI spec, Lambda fat JAR |
 
-## Build
-
-```bash
-mvn clean package -DskipTests
-```
-
-The shade plugin in `recipes-api/pom.xml` produces the deployable fat JAR at
-`recipes-api/target/recipes-api-rest-1.0.0.jar`.
-
 ## Testing
 
 There is no embedded HTTP server and no `main()` class. Local testing is done
 exclusively via SAM CLI, which emulates the Lambda runtime in Docker.
 
+`sam build` runs the full Maven build internally (via the Makefile in `recipes-api/`)
+— no separate `mvn package` step is needed.
+
 ### Prerequisites
 
 - Docker running
 - [SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) installed
-- Fat JAR already built (`mvn clean package -DskipTests`)
 
 ### Start local API
 
@@ -38,6 +31,16 @@ sam local start-api
 ```
 
 API is available at `http://localhost:3000`.
+
+> `sam local start-api` runs entirely in Docker — no AWS calls, no cost.
+
+### Debug with IntelliJ
+
+```bash
+sam local start-api --debug-port 5858 --debug-args "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5858"
+```
+
+Create a **Remote JVM Debug** run configuration in IntelliJ (`Run → Edit Configurations → + → Remote JVM Debug`) with host `localhost` and port `5858`. With `suspend=y` the container pauses until the debugger attaches — send a request first, then attach.
 
 ### Example requests
 

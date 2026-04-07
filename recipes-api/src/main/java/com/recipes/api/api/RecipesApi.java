@@ -16,16 +16,23 @@ import jakarta.validation.Valid;
 import java.util.List;
 
 /**
- * Routing contract for the Recipes API, derived from openapi.yaml.
+ * Routing contract for the Recipes API, derived from {@code openapi.yaml}.
  *
- * <p>This interface carries the Micronaut HTTP routing annotations and serves the same
- * purpose as the auto-generated Spring {@code RecipesApi} interface in the sibling project:
- * it is the spec-first contract that {@code RecipesController} implements.
+ * <p>This interface carries the Micronaut HTTP routing annotations ({@code @Get}, {@code @Post},
+ * {@code @Produces}, {@code @Consumes}, etc.) and is the spec-first contract that
+ * {@link com.recipes.api.controller.RecipesController} implements.
  *
- * <p>Models ({@code CreateRecipeRequest}, {@code RecipeDetailResponse},
- * {@code RecipeSummaryResponse}) are generated from {@code openapi.yaml} at build time.
- * Only the routing interface is hand-written, because the OpenAPI {@code java} generator
- * (used here for model-only generation) does not produce Micronaut-annotated API stubs.
+ * <p><b>Why this interface is hand-written:</b><br>
+ * The {@code java-micronaut-server} OpenAPI Generator (v7.5.0) does not support generating a
+ * standalone routing interface. It generates a single concrete {@code @Controller} class with
+ * stub implementations ({@code throw NOT_IMPLEMENTED}), with no option to produce an interface
+ * only. The {@code generateImplementationFiles=false} config option silently suppresses all API
+ * file generation rather than producing just the interface, making automated generation of this
+ * contract impossible with this generator version.
+ *
+ * <p>As a result, models ({@code CreateRecipeRequest}, {@code RecipeDetailResponse},
+ * {@code RecipeSummaryResponse}) are generated from the spec at build time, but this routing
+ * interface must be kept in sync with {@code openapi.yaml} manually when endpoints change.
  */
 public interface RecipesApi {
 
