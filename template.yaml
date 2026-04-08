@@ -29,28 +29,16 @@ Globals:
         DYNAMODB_ENDPOINT: ""
 
 Resources:
-  RecipesFunction:
+  ListRecipesFunction:
     Type: AWS::Serverless::Function
     Metadata:
-      # SAM's built-in Java Maven workflow only supports single-module projects.
-      # The Makefile runs 'mvn clean package -DskipTests' from the project root
-      # (building all three modules) then copies the fat JAR to ARTIFACTS_DIR.
       BuildMethod: makefile
     Properties:
-      # Micronaut's built-in API Gateway proxy handler. Initialises the Micronaut
-      # application context and routes each API Gateway proxy event to the
-      # appropriate Micronaut controller. No custom handler class required.
-      Handler: io.micronaut.function.aws.proxy.payload1.ApiGatewayProxyRequestEventFunction
-
-      # Project root — SAM copies the full multi-module tree to the build temp
-      # directory so Maven can resolve all sibling modules when building.
+      Handler: com.recipes.api.handler.ListRecipesHandler
       CodeUri: ./
       Policies:
-        # Grants the Lambda execution role read/write access to the Recipes DynamoDB table.
         - DynamoDBCrudPolicy:
             TableName: !Ref RecipesTable
-
-      # API Gateway event sources — one entry per endpoint.
       Events:
         ListRecipes:
           Type: Api
@@ -58,17 +46,39 @@ Resources:
             Path: /recipes
             Method: GET
 
-        CreateRecipe:
-          Type: Api
-          Properties:
-            Path: /recipes
-            Method: POST
-
+  GetRecipeByIdFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Handler: com.recipes.api.handler.GetRecipeByIdHandler
+      CodeUri: ./
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RecipesTable
+      Events:
         GetRecipeById:
           Type: Api
           Properties:
             Path: /recipes/{id}
             Method: GET
+
+  CreateRecipeFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Handler: com.recipes.api.handler.CreateRecipeHandler
+      CodeUri: ./
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RecipesTable
+      Events:
+        CreateRecipe:
+          Type: Api
+          Properties:
+            Path: /recipes
+            Method: POST
 
   RecipesTable:
     Type: AWS::DynamoDB::Table
@@ -85,7 +95,7 @@ Resources:
           KeyType: HASH
 
 Outputs:
-  RecipesFunctionApi:
+  RecipesApiEndpoint:
     Description: API Gateway endpoint URL
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
   RecipesTableName:

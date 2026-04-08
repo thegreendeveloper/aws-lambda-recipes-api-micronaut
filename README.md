@@ -1,6 +1,7 @@
 # Recipes API — Micronaut on AWS Lambda
 
-A spec-first REST API built with Micronaut, deployed as an AWS Lambda function behind API Gateway.
+A spec-first REST API built with Micronaut, structured as microservices — one Lambda function per endpoint — behind API
+Gateway, with DynamoDB as the data store.
 
 ## Prerequisites
 
@@ -95,8 +96,8 @@ sam deploy --guided
 ## Project structure
 
 ```
-recipes-repository/   Entity + repository (JPA)
+recipes-repository/   DynamoDB entity + repository
 recipes-service/      Business logic + domain models
-recipes-api/          Controllers + OpenAPI spec + Lambda fat JAR
-template.yaml         SAM template (Lambda + API Gateway)
+recipes-api/          Lambda handlers + OpenAPI spec + fat JAR
+template.yaml         SAM template (3 Lambda functions + API Gateway + DynamoDB)
 ```
