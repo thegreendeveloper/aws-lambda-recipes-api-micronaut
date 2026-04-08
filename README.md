@@ -21,6 +21,21 @@ sam local start-api
 
 The API is available at `http://localhost:3000`.
 
+### Start local DynamoDB
+
+A `docker-compose.yml` is included that starts DynamoDB Local and creates the `Recipes` table:
+
+```bash
+docker compose up
+```
+
+Then in a second terminal:
+
+```bash
+sam build
+sam local start-api --env-vars env.json
+```
+
 > **Note:** `sam local start-api` runs entirely in Docker on your machine — it never touches AWS and incurs no cost.
 
 ### Debugging with IntelliJ

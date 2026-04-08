@@ -21,6 +21,13 @@ Globals:
     # Still generous enough to accommodate Docker startup on the first SAM local request.
     Timeout: 30
 
+    Environment:
+      Variables:
+        # Resolved at deploy time to the actual DynamoDB table name.
+        RECIPES_TABLE_NAME: !Ref RecipesTable
+        # Empty in production — overridden in env.json for local testing against DynamoDB Local.
+        DYNAMODB_ENDPOINT: ""
+
 Resources:
   RecipesFunction:
     Type: AWS::Serverless::Function
@@ -38,6 +45,10 @@ Resources:
       # Project root — SAM copies the full multi-module tree to the build temp
       # directory so Maven can resolve all sibling modules when building.
       CodeUri: ./
+      Policies:
+        # Grants the Lambda execution role read/write access to the Recipes DynamoDB table.
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RecipesTable
 
       # API Gateway event sources — one entry per endpoint.
       Events:
@@ -59,7 +70,24 @@ Resources:
             Path: /recipes/{id}
             Method: GET
 
+  RecipesTable:
+    Type: AWS::DynamoDB::Table
+    # Retain ensures the table and its data survive a stack deletion (important in production).
+    DeletionPolicy: Retain
+    Properties:
+      TableName: Recipes
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
 Outputs:
   RecipesFunctionApi:
     Description: API Gateway endpoint URL
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  RecipesTableName:
+    Description: DynamoDB table name
+    Value: !Ref RecipesTable
