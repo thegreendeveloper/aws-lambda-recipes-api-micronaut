@@ -21,25 +21,24 @@ Globals:
     # Still generous enough to accommodate Docker startup on the first SAM local request.
     Timeout: 30
 
+    Environment:
+      Variables:
+        # Resolved at deploy time to the actual DynamoDB table name.
+        RECIPES_TABLE_NAME: !Ref RecipesTable
+        # Empty in production — overridden in env.json for local testing against DynamoDB Local.
+        DYNAMODB_ENDPOINT: ""
+
 Resources:
-  RecipesFunction:
+  ListRecipesFunction:
     Type: AWS::Serverless::Function
     Metadata:
-      # SAM's built-in Java Maven workflow only supports single-module projects.
-      # The Makefile runs 'mvn clean package -DskipTests' from the project root
-      # (building all three modules) then copies the fat JAR to ARTIFACTS_DIR.
       BuildMethod: makefile
     Properties:
-      # Micronaut's built-in API Gateway proxy handler. Initialises the Micronaut
-      # application context and routes each API Gateway proxy event to the
-      # appropriate Micronaut controller. No custom handler class required.
-      Handler: io.micronaut.function.aws.proxy.payload1.ApiGatewayProxyRequestEventFunction
-
-      # Project root — SAM copies the full multi-module tree to the build temp
-      # directory so Maven can resolve all sibling modules when building.
+      Handler: com.recipes.api.handler.ListRecipesHandler
       CodeUri: ./
-
-      # API Gateway event sources — one entry per endpoint.
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RecipesTable
       Events:
         ListRecipes:
           Type: Api
@@ -47,19 +46,58 @@ Resources:
             Path: /recipes
             Method: GET
 
-        CreateRecipe:
-          Type: Api
-          Properties:
-            Path: /recipes
-            Method: POST
-
+  GetRecipeByIdFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Handler: com.recipes.api.handler.GetRecipeByIdHandler
+      CodeUri: ./
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RecipesTable
+      Events:
         GetRecipeById:
           Type: Api
           Properties:
             Path: /recipes/{id}
             Method: GET
 
+  CreateRecipeFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Handler: com.recipes.api.handler.CreateRecipeHandler
+      CodeUri: ./
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RecipesTable
+      Events:
+        CreateRecipe:
+          Type: Api
+          Properties:
+            Path: /recipes
+            Method: POST
+
+  RecipesTable:
+    Type: AWS::DynamoDB::Table
+    # Retain ensures the table and its data survive a stack deletion (important in production).
+    DeletionPolicy: Retain
+    Properties:
+      TableName: Recipes
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
 Outputs:
-  RecipesFunctionApi:
+  RecipesApiEndpoint:
     Description: API Gateway endpoint URL
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  RecipesTableName:
+    Description: DynamoDB table name
+    Value: !Ref RecipesTable

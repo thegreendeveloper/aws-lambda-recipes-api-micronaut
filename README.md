@@ -1,6 +1,7 @@
 # Recipes API — Micronaut on AWS Lambda
 
-A spec-first REST API built with Micronaut, deployed as an AWS Lambda function behind API Gateway.
+A spec-first REST API built with Micronaut, structured as microservices — one Lambda function per endpoint — behind API
+Gateway, with DynamoDB as the data store.
 
 ## Prerequisites
 
@@ -20,6 +21,21 @@ sam local start-api
 ```
 
 The API is available at `http://localhost:3000`.
+
+### Start local DynamoDB
+
+A `docker-compose.yml` is included that starts DynamoDB Local and creates the `Recipes` table:
+
+```bash
+docker compose up
+```
+
+Then in a second terminal:
+
+```bash
+sam build
+sam local start-api --env-vars env.json
+```
 
 > **Note:** `sam local start-api` runs entirely in Docker on your machine — it never touches AWS and incurs no cost.
 
@@ -80,8 +96,8 @@ sam deploy --guided
 ## Project structure
 
 ```
-recipes-repository/   Entity + repository (JPA)
+recipes-repository/   DynamoDB entity + repository
 recipes-service/      Business logic + domain models
-recipes-api/          Controllers + OpenAPI spec + Lambda fat JAR
-template.yaml         SAM template (Lambda + API Gateway)
+recipes-api/          Lambda handlers + OpenAPI spec + fat JAR
+template.yaml         SAM template (3 Lambda functions + API Gateway + DynamoDB)
 ```

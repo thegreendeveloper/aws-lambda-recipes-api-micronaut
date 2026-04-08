@@ -1,14 +1,26 @@
-# Recipes API — Micronaut Lambda
+# Recipes API — Micronaut Lambda Microservices
+
+## Purpose
+
+A reference project demonstrating a true serverless microservice setup on AWS:
+one Lambda function per endpoint, API Gateway for routing, and DynamoDB as the data store.
+The focus is on project structure and separation of concerns across Lambda functions.
+
+The project follows a spec-first approach — the OpenAPI spec drives model generation — though
+this is partially compromised by the microservice handler pattern: the handlers call the service
+layer directly, bypassing HTTP routing, so the spec no longer governs the entry points.
+The generated models (`CreateRecipeRequest`, `RecipeDetailResponse`, `RecipeSummaryResponse`)
+remain the canonical contract, but the routing annotations are gone.
 
 ## Project structure
 
 Multi-module Maven project:
 
-| Module | Artifact | Purpose |
-|---|---|---|
-| `recipes-repository` | `recipes-repository` | JPA entity + repository |
-| `recipes-service` | `recipes-service` | Business logic, domain models, exceptions |
-| `recipes-api` | `recipes-api-rest` | REST controllers, OpenAPI spec, Lambda fat JAR |
+| Module               | Artifact             | Purpose                                   |
+|----------------------|----------------------|-------------------------------------------|
+| `recipes-repository` | `recipes-repository` | DynamoDB entity + repository              |
+| `recipes-service`    | `recipes-service`    | Business logic, domain models, exceptions |
+| `recipes-api`        | `recipes-api-rest`   | Lambda handlers, OpenAPI spec, fat JAR    |
 
 ## Testing
 
@@ -60,24 +72,58 @@ curl -X POST http://localhost:3000/recipes \
 ### Invoke a single function
 
 ```bash
-sam local invoke RecipesFunction --event events/list-recipes.json
+sam local invoke ListRecipesFunction --event events/list-recipes.json --env-vars env.json
+sam local invoke GetRecipeByIdFunction --event events/get-recipe.json --env-vars env.json
+sam local invoke CreateRecipeFunction --event events/create-recipe.json --env-vars env.json
 ```
 
-## Lambda handler
+## Lambda handlers
 
-`io.micronaut.function.aws.proxy.payload1.ApiGatewayProxyRequestEventFunction`
+Each function has a dedicated handler class in `recipes-api/src/main/java/com/recipes/api/handler/`:
 
-Micronaut's built-in handler — no custom handler class required. It initialises
-the Micronaut application context and routes each API Gateway proxy event to the
-appropriate controller.
+| Function                | Handler class          |
+|-------------------------|------------------------|
+| `ListRecipesFunction`   | `ListRecipesHandler`   |
+| `GetRecipeByIdFunction` | `GetRecipeByIdHandler` |
+| `CreateRecipeFunction`  | `CreateRecipeHandler`  |
+
+Each extends `MicronautRequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent>`,
+injects `RecipesService` via Micronaut DI, and handles its own error mapping.
+
+## Coding conventions
+
+### Extract complex chains into named methods
+
+Any builder chain or stream pipeline longer than 2 steps must be extracted into
+a private method with a descriptive name.
+
+Extract the builder/stream call into a private method named after what it does, and call that method from the public one.
+
+## Known limitations
+
+### No integration tests for `RecipesRepository`
+
+Integration tests using Testcontainers (to spin up `amazon/dynamodb-local` in Docker) were
+attempted but could not be made to work on Docker Desktop 4.67.0 on Windows. Both the TCP proxy
+(`localhost:2375`) and the named pipe (`//./pipe/docker_engine`) return HTTP 400 for the Docker
+`/info` call that Testcontainers uses to validate the connection, even though the Docker daemon
+itself is healthy and the Docker CLI works normally.
+
+The unit tests in `RecipesRepositoryUnitTest` cover the mapping logic and SDK call verification
+via Mockito mocks. If integration tests are needed in future, consider:
+- Installing [Testcontainers Desktop](https://testcontainers.com/desktop/) which provides a
+  bridge service that resolves this Docker Desktop compatibility issue
+- Running tests inside WSL2 where the Docker Unix socket is directly accessible
 
 ## Design decisions
 
 - **No main class** — this is a Lambda-only project. There is no embedded server
   and no `main()` entry point. Local development uses `sam local start-api`.
-- **OpenAPI generator produces models only** — `generateApis=false` in the plugin
-  config. The routing interface `RecipesApi` (`com.recipes.api.api`) is
-  hand-written because `java-micronaut-server` does not reliably generate a
-  standalone interface with Micronaut annotations.
+- **One handler per operation** — each Lambda function has a dedicated handler class
+  (`ListRecipesHandler`, `GetRecipeByIdHandler`, `CreateRecipeHandler`) that extends
+  `MicronautRequestHandler` and calls the service directly. All three share a single fat JAR.
+- **OpenAPI generator produces models only** — `generateApis=false` in the plugin config.
+  Model classes (`CreateRecipeRequest`, `RecipeDetailResponse`, `RecipeSummaryResponse`) are
+  generated from the spec at build time. There is no generated API interface or controller.
 - **No Netty dependency** — excluded from the fat JAR to keep it lean. Lambda
   does not need an embedded HTTP server.

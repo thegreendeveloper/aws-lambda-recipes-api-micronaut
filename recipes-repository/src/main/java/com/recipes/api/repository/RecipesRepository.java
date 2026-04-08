@@ -2,58 +2,120 @@ package com.recipes.api.repository;
 
 import com.recipes.api.model.RecipeEntity;
 import jakarta.inject.Singleton;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.ScanRequest;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.UUID;
 
 @Singleton
 public class RecipesRepository {
 
-    private final List<RecipeEntity> store = new ArrayList<>();
-    private final AtomicInteger idCounter = new AtomicInteger(0);
+    private final DynamoDbClient dynamoDbClient;
+    private final String tableName;
 
-    public RecipesRepository() {
-        store.add(new RecipeEntity(
-                String.valueOf(idCounter.incrementAndGet()),
-                "Spaghetti Carbonara",
-                "Italian",
-                30,
-                List.of("spaghetti", "eggs", "pancetta", "parmesan", "black pepper"),
-                List.of("Cook pasta", "Fry pancetta", "Mix eggs and cheese", "Combine all")
-        ));
-        store.add(new RecipeEntity(
-                String.valueOf(idCounter.incrementAndGet()),
-                "Chicken Tikka Masala",
-                "Indian",
-                45,
-                List.of("chicken", "tomato sauce", "cream", "spices"),
-                List.of("Marinate chicken", "Grill chicken", "Make sauce", "Combine and simmer")
-        ));
-        store.add(new RecipeEntity(
-                String.valueOf(idCounter.incrementAndGet()),
-                "Beef Tacos",
-                "Mexican",
-                20,
-                List.of("ground beef", "taco shells", "cheese", "lettuce", "salsa"),
-                List.of("Brown beef", "Season beef", "Assemble tacos")
-        ));
+    public RecipesRepository(DynamoDbClient dynamoDbClient) {
+        this(dynamoDbClient, System.getenv("RECIPES_TABLE_NAME"));
+    }
+
+    // Package-private — used by tests to inject the table name directly without env vars.
+    RecipesRepository(DynamoDbClient dynamoDbClient, String tableName) {
+        this.dynamoDbClient = dynamoDbClient;
+        this.tableName = tableName;
     }
 
     public List<RecipeEntity> findAll() {
-        return new ArrayList<>(store);
+        return scanAllItems().stream()
+                .map(this::fromAttributeMap)
+                .toList();
     }
 
     public Optional<RecipeEntity> findById(String id) {
-        return store.stream()
-                .filter(r -> r.getId().equals(id))
-                .findFirst();
+        Map<String, AttributeValue> item = fetchItemById(id);
+        if (item == null || item.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(fromAttributeMap(item));
     }
 
     public RecipeEntity save(RecipeEntity entity) {
-        entity.setId(String.valueOf(idCounter.incrementAndGet()));
-        store.add(entity);
+        entity.setId(UUID.randomUUID().toString());
+        dynamoDbClient.putItem(buildPutItemRequest(entity));
         return entity;
+    }
+
+    public void delete(String id) {
+        dynamoDbClient.deleteItem(buildDeleteItemRequest(id));
+    }
+
+    private List<Map<String, AttributeValue>> scanAllItems() {
+        return dynamoDbClient.scan(ScanRequest.builder()
+                        .tableName(tableName)
+                        .build())
+                .items();
+    }
+
+    private Map<String, AttributeValue> fetchItemById(String id) {
+        return dynamoDbClient.getItem(GetItemRequest.builder()
+                        .tableName(tableName)
+                        .key(Map.of("id", AttributeValue.fromS(id)))
+                        .build())
+                .item();
+    }
+
+    private PutItemRequest buildPutItemRequest(RecipeEntity entity) {
+        return PutItemRequest.builder()
+                .tableName(tableName)
+                .item(toAttributeMap(entity))
+                .build();
+    }
+
+    private DeleteItemRequest buildDeleteItemRequest(String id) {
+        return DeleteItemRequest.builder()
+                .tableName(tableName)
+                .key(Map.of("id", AttributeValue.fromS(id)))
+                .build();
+    }
+
+    private Map<String, AttributeValue> toAttributeMap(RecipeEntity entity) {
+        List<AttributeValue> ingredients = toAttributeValueList(entity.getIngredients());
+        List<AttributeValue> steps = toAttributeValueList(entity.getSteps());
+        return Map.of(
+                "id", AttributeValue.fromS(entity.getId()),
+                "name", AttributeValue.fromS(entity.getName()),
+                "cuisine", AttributeValue.fromS(entity.getCuisine()),
+                "prepTimeMinutes", AttributeValue.fromN(String.valueOf(entity.getPrepTimeMinutes())),
+                "ingredients", AttributeValue.fromL(ingredients),
+                "steps", AttributeValue.fromL(steps)
+        );
+    }
+
+    private RecipeEntity fromAttributeMap(Map<String, AttributeValue> item) {
+        return RecipeEntity.builder()
+                .id(item.get("id").s())
+                .name(item.get("name").s())
+                .cuisine(item.get("cuisine").s())
+                .prepTimeMinutes(Integer.parseInt(item.get("prepTimeMinutes").n()))
+                .ingredients(toStringList(item.get("ingredients")))
+                .steps(toStringList(item.get("steps")))
+                .build();
+    }
+
+    private List<AttributeValue> toAttributeValueList(List<String> values) {
+        return values.stream()
+                .map(AttributeValue::fromS)
+                .toList();
+    }
+
+    private List<String> toStringList(AttributeValue attributeValue) {
+        return attributeValue.l().stream()
+                .map(AttributeValue::s)
+                .toList();
     }
 }
