@@ -35,11 +35,21 @@ exclusively via SAM CLI, which emulates the Lambda runtime in Docker.
 - Docker running
 - [SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) installed
 
+### Start local DynamoDB
+
+A `docker-compose.yml` is included that starts DynamoDB Local and creates the `Recipes` table:
+
+```bash
+docker compose up
+```
+
 ### Start local API
+
+In a second terminal, after DynamoDB is running:
 
 ```bash
 sam build
-sam local start-api
+sam local start-api --env-vars env.json
 ```
 
 API is available at `http://localhost:3000`.

@@ -51,6 +51,12 @@
             <artifactId>s3</artifactId>
         </dependency>
 
+        <!-- URL connection HTTP client — synchronous HTTP for Lambda (no Netty) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
+        </dependency>
+
         <!-- Swagger annotations — required by OpenAPI-generated model classes -->
         <dependency>
             <groupId>io.swagger.core.v3</groupId>
@@ -84,19 +90,42 @@
 
         <!-- Test -->
         <dependency>
-            <groupId>io.micronaut.test</groupId>
-            <artifactId>micronaut-test-junit5</artifactId>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
         <plugins>
+            <!--
+                Suppress compiler warnings for this module. Warnings originate from
+                generated model classes (Lombok @Builder + field initializers) that
+                we cannot modify. Checkstyle covers hand-written code quality.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <showWarnings>false</showWarnings>
+                </configuration>
+            </plugin>
+
             <!-- OpenAPI Generator — generates request/response model POJOs from the spec -->
             <plugin>
                 <groupId>org.openapitools</groupId>
