@@ -64,7 +64,8 @@ class ImportRecipesHandlerTest {
     }
 
     private void stubS3Download(String content) {
-        ResponseBytes<GetObjectResponse> responseBytes = ResponseBytes.fromByteArray(GetObjectResponse.builder().build(), content.getBytes());
+        GetObjectResponse response = GetObjectResponse.builder().build();
+        ResponseBytes<GetObjectResponse> responseBytes = ResponseBytes.fromByteArray(response, content.getBytes());
         when(s3Client.getObjectAsBytes(any(GetObjectRequest.class))).thenReturn(responseBytes);
     }
 

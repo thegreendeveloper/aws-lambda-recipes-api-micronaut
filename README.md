@@ -113,6 +113,67 @@ sam build
 sam deploy
 ```
 
+### Dead Letter Queue
+
+`ImportRecipesFunction` is invoked asynchronously by S3. If the handler throws on every attempt (after 2 retries),
+Lambda forwards the original S3 event JSON to an SQS Dead Letter Queue so the failure is not silently lost.
+
+#### Verify the DLQ is wired after deploy
+
+In the AWS console: **Lambda → Functions → `recipes-import-<stack-name>` → Configuration → Asynchronous invocation**
+
+Check that:
+
+- **Retry attempts** is **2**
+- Under **Destinations**, there is an entry labelled **Async inv** with an SQS ARN ending in
+  `recipes-import-dlq-<stack-name>`
+
+The DLQ URL is also printed as a stack output at the end of `sam deploy`.
+
+#### Trigger a test failure
+
+Upload a file with invalid JSON to the import bucket:
+
+```bash
+echo "not-valid-json" | aws s3 cp - s3://recipes-import-<account-id>-<region>/bad-import.json
+```
+
+Lambda will attempt the invocation 3 times total with exponential back-off (~3–5 minutes), then route the event to the
+DLQ.
+
+#### Confirm the message landed
+
+```bash
+aws sqs receive-message \
+  --queue-url <dlq-url> \
+  --attribute-names All
+```
+
+The DLQ URL is printed as a stack output after `sam deploy`. The message body is the original S3 event JSON. The
+`ErrorCode` and `ErrorMessage` message attributes describe why it failed.
+
+**In the AWS console:** SQS → Queues → `recipes-import-dlq-<stack>` → Send and receive messages → Poll for messages.
+
+#### Replay a failed event
+
+Once you have fixed the underlying problem (e.g. replaced the bad file), re-invoke the function manually using the DLQ
+message body:
+
+```bash
+aws lambda invoke \
+  --function-name $(aws cloudformation describe-stack-resource \
+    --stack-name <stack-name> \
+    --logical-resource-id ImportRecipesFunction \
+    --query "StackResourceDetail.PhysicalResourceId" --output text) \
+  --invocation-type RequestResponse \
+  --payload '<message-body-from-dlq>' \
+  response.json
+```
+
+Then purge the message from the DLQ so it is not processed again:
+
+**SQS console** → `recipes-import-dlq-<stack>` → Purge.
+
 ### Tearing down
 
 Before running `sam delete`, you must manually empty the S3 import bucket — CloudFormation cannot delete a non-empty bucket:
