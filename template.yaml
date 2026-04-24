@@ -92,6 +92,14 @@ Resources:
             BucketName: !Sub "recipes-import-${AWS::AccountId}-${AWS::Region}"
         - DynamoDBCrudPolicy:
             TableName: !Ref RecipesTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt RecipesImportDLQ.QueueName
+      EventInvokeConfig:
+        MaximumRetryAttempts: 2
+        DestinationConfig:
+          OnFailure:
+            Type: SQS
+            Destination: !GetAtt RecipesImportDLQ.Arn
 
   # Grants S3 permission to invoke ImportRecipesFunction.
   # The bucket notification is configured post-deploy via the Makefile (make configure-s3-trigger).
@@ -110,6 +118,12 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "recipes-import-${AWS::AccountId}-${AWS::Region}"
+
+  RecipesImportDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "recipes-import-dlq-${AWS::StackName}"
+      MessageRetentionPeriod: 1209600  # 14 days (SQS max)
 
   RecipesTable:
     Type: AWS::DynamoDB::Table
@@ -138,3 +152,6 @@ Outputs:
   ImportRecipesFunctionArn:
     Description: ARN of the ImportRecipes Lambda function
     Value: !GetAtt ImportRecipesFunction.Arn
+  RecipesImportDLQUrl:
+    Description: URL of the DLQ for failed recipe imports
+    Value: !Ref RecipesImportDLQ

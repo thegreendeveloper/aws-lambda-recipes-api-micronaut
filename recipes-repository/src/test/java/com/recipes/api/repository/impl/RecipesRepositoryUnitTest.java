@@ -1,4 +1,4 @@
-package com.recipes.api.repository;
+package com.recipes.api.repository.impl;
 
 import com.recipes.api.model.RecipeEntity;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,15 +29,16 @@ import static org.mockito.Mockito.when;
 class RecipesRepositoryUnitTest {
 
     private static final String TABLE_NAME = "Recipes";
+    private static final String RECIPE_ID = "abc";
 
     @Mock
     private DynamoDbClient dynamoDbClient;
 
-    private RecipesRepository repository;
+    private DynamoDbRecipesRepository repository;
 
     @BeforeEach
     void setUp() {
-        repository = new RecipesRepository(dynamoDbClient, TABLE_NAME);
+        repository = new DynamoDbRecipesRepository(dynamoDbClient, TABLE_NAME);
     }
 
     @Test
@@ -67,7 +68,7 @@ class RecipesRepositoryUnitTest {
 
     @Test
     void findByIdReturnsRecipeWhenItemExists() {
-        when(dynamoDbClient.getItem(any(GetItemRequest.class))).thenReturn(buildGetItemResponse("abc"));
+        when(dynamoDbClient.getItem(any(GetItemRequest.class))).thenReturn(buildGetItemResponse());
 
         Optional<RecipeEntity> result = repository.findById("abc");
 
@@ -110,21 +111,21 @@ class RecipesRepositoryUnitTest {
                 .build();
     }
 
-    private GetItemResponse buildGetItemResponse(String id) {
+    private GetItemResponse buildGetItemResponse() {
         return GetItemResponse.builder()
-                .item(buildFakeAttributeMap(id))
+                .item(buildFakeAttributeMap())
                 .build();
     }
 
     private ScanResponse buildScanResponse() {
         return ScanResponse.builder()
-                .items(List.of(buildFakeAttributeMap("abc")))
+                .items(List.of(buildFakeAttributeMap()))
                 .build();
     }
 
-    private Map<String, AttributeValue> buildFakeAttributeMap(String id) {
+    private Map<String, AttributeValue> buildFakeAttributeMap() {
         return Map.of(
-                "id", AttributeValue.fromS(id),
+                "id", AttributeValue.fromS(RecipesRepositoryUnitTest.RECIPE_ID),
                 "name", AttributeValue.fromS("Pasta"),
                 "cuisine", AttributeValue.fromS("Italian"),
                 "prepTimeMinutes", AttributeValue.fromN("20"),
