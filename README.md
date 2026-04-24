@@ -89,9 +89,43 @@ curl -X POST http://localhost:3000/recipes \
 
 ## Deploy
 
+### First deploy
+
 ```bash
+sam build
 sam deploy --guided
 ```
+
+Follow the prompts — your answers are saved to `samconfig.toml` for future deploys.
+
+After deploy completes, wire the S3 trigger for the import function:
+
+```bash
+make configure-recipes-import-trigger
+```
+
+This is a one-time step that tells the S3 bucket to invoke `ImportRecipesFunction` on upload.
+
+### Subsequent deploys
+
+```bash
+sam build
+sam deploy
+```
+
+### Tearing down
+
+Before running `sam delete`, you must manually empty the S3 import bucket — CloudFormation cannot delete a non-empty bucket:
+
+**S3** → `recipes-import-<account-id>-<region>` → select all files → **Delete**
+
+Then:
+
+```bash
+sam delete
+```
+
+> **Note:** The DynamoDB table has `DeletionPolicy: Retain` — it survives `sam delete` and keeps its data. If you want a clean redeploy, manually delete the `Recipes` table from the DynamoDB console before running `sam deploy` again, otherwise CloudFormation will fail trying to create a table that already exists.
 
 ## Project structure
 

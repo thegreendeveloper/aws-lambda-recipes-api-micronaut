@@ -21,18 +21,13 @@
             <artifactId>recipes-service</artifactId>
         </dependency>
 
-        <!-- Micronaut HTTP — routing annotations and HttpResponse used by controllers -->
+        <!-- Micronaut HTTP — required by micronaut-function-aws-api-proxy -->
         <dependency>
             <groupId>io.micronaut</groupId>
             <artifactId>micronaut-http</artifactId>
         </dependency>
 
-        <!--
-            Micronaut Lambda API Gateway proxy — bridges API Gateway proxy events to
-            Micronaut's router without starting an embedded HTTP server.
-            The built-in handler class configured in template.yaml:
-              io.micronaut.function.aws.proxy.payload1.ApiGatewayProxyRequestEventFunction
-        -->
+        <!-- Micronaut Lambda API Gateway proxy — bridges API Gateway proxy events to Micronaut DI -->
         <dependency>
             <groupId>io.micronaut.aws</groupId>
             <artifactId>micronaut-function-aws-api-proxy</artifactId>
@@ -48,6 +43,12 @@
         <dependency>
             <groupId>io.micronaut.validation</groupId>
             <artifactId>micronaut-validation</artifactId>
+        </dependency>
+
+        <!-- AWS SDK v2 S3 — used by ImportRecipesHandler to download import files -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
         </dependency>
 
         <!-- Swagger annotations — required by OpenAPI-generated model classes -->
@@ -112,8 +113,7 @@
 
                             <!--
                                 java-micronaut-server generates model POJOs from the spec.
-                                API generation is disabled (generateApis=false); the routing
-                                interface RecipesApi is hand-written in com.recipes.api.api.
+                                API generation is disabled — handlers call the service layer directly.
                             -->
                             <generatorName>java-micronaut-server</generatorName>
                             <output>${project.build.directory}/generated-sources/openapi</output>
@@ -129,7 +129,7 @@
 
                             <configOptions>
                                 <!--
-                                    reactive=false: return HttpResponse<T> instead of Mono<HttpResponse<T>>.
+                                    reactive=false: return plain types instead of Mono<T>.
                                     useTags=true: group by OpenAPI tag ("Recipes") for the class name.
                                 -->
                                 <reactive>false</reactive>

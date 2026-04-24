@@ -80,6 +80,37 @@ Resources:
             Path: /recipes
             Method: POST
 
+  ImportRecipesFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Handler: com.recipes.api.handler.ImportRecipesHandler
+      CodeUri: ./
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Sub "recipes-import-${AWS::AccountId}-${AWS::Region}"
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RecipesTable
+
+  # Grants S3 permission to invoke ImportRecipesFunction.
+  # The bucket notification is configured post-deploy via the Makefile (make configure-s3-trigger).
+  # SAM's Type:S3 event cannot be used here — it creates a circular dependency when the
+  # bucket is defined in the same template.
+  ImportRecipesFunctionS3Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt ImportRecipesFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub "arn:aws:s3:::recipes-import-${AWS::AccountId}-${AWS::Region}"
+
+  RecipesImportBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "recipes-import-${AWS::AccountId}-${AWS::Region}"
+
   RecipesTable:
     Type: AWS::DynamoDB::Table
     # Retain ensures the table and its data survive a stack deletion (important in production).
@@ -101,3 +132,9 @@ Outputs:
   RecipesTableName:
     Description: DynamoDB table name
     Value: !Ref RecipesTable
+  RecipesImportBucketName:
+    Description: S3 bucket for bulk recipe imports
+    Value: !Ref RecipesImportBucket
+  ImportRecipesFunctionArn:
+    Description: ARN of the ImportRecipes Lambda function
+    Value: !GetAtt ImportRecipesFunction.Arn
